@@ -1,0 +1,71 @@
+#!/bin/bash
+
+sudo cat > ~/ansible/playbooks/create_users.yml <<'CUSTOM_EOF1'
+
+- name: Include create_users role
+  hosts: buxgalters
+  become: yes
+  roles:
+    - create_users
+
+
+
+CUSTOM_EOF1
+
+role=create_users; mkdir -p ~/ansible/roles/$role; cd ~/ansible/roles/$role; mkdir tasks handlers templates files vars defaults meta; touch tasks/main.yml handlers/main.yml vars/main.yml defaults/main.yml meta/main.yml
+
+
+sudo cat > ~/ansible/roles/create_users/defaults/main.yml <<'CUSTOM_EOF2'
+
+new_user: newuser
+new_user_password: changeme
+
+CUSTOM_EOF2
+
+sudo cat > ~/ansible/roles/create_users/vars/main.yml <<'CUSTOM_EOF3'
+
+# vars file for my_playbook
+your_package_name: sudo
+
+CUSTOM_EOF3
+
+sudo cat > ~/ansible/roles/create_users/handlers/main.yml <<'CUSTOM_EOF4'
+
+- name: restart sshd
+  systemd:
+    name: sshd
+    state: restarted
+
+CUSTOM_EOF4
+
+sudo cat > ~/ansible/roles/create_users/tasks/main.yml <<'CUSTOM_EOF5'
+
+# tasks file for my_playbook
+---
+- name: Install package
+  apt:
+    name: "{{ your_package_name }}"
+    state: present
+  notify: Update apt cache
+
+# Tasks
+- name: Create new user
+  user:
+    name: "{{ new_user }}"
+    password: "{{ new_user_password | password_hash('sha512') }}"
+    groups: sudo
+    shell: /bin/bash
+    state: present
+  notify: restart sshd
+
+- name: Ensure sudo group has passwordless sudo
+  lineinfile:
+    path: /etc/sudoers
+    state: present
+    regexp: '^%sudo'
+    line: '%sudo ALL=(ALL:ALL) NOPASSWD:ALL'
+
+CUSTOM_EOF5
+
+cd ~/ansible/
+ansible-playbook -i ./inventory/hosts -K ./playbooks/create_users.yml
